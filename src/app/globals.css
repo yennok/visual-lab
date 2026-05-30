@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+/*
+ * Per-brand theming hooks. The chrome stays neutral; each Brand row can later
+ * override these CSS variables so its own tokens take over when its theme is
+ * active. --brand defaults to the LAB2 lime as the seed style template.
+ */
+:root {
+  --brand: 40 239 138; /* #28ef8a — LAB2 default; per-brand override later */
+  --ink: 10 10 10;
+  --surface: 240 240 240;
+}
+
+@theme inline {
+  --color-brand: rgb(var(--brand));
+  --color-ink: rgb(var(--ink));
+  --color-surface: rgb(var(--surface));
+  --radius-card: 18px;
+  --radius-pill: 999px;
+}
+
+body {
+  background: white;
+  color: rgb(var(--ink));
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
