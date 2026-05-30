@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  clerkUserId        String    @unique
+  email              String    @unique
+  planTier           String    @default("trial") // trial | solo | studio | pro
+  stripeCustomerId   String?   @unique
+  trialEndsAt        DateTime?
+  imageQuotaUsed     Int       @default(0)
+  imageQuotaResetAt  DateTime?
+  imageBundleBalance Int       @default(0)
+  createdAt          DateTime  @default(now())
+
+  brands          Brand[]
+  clients         Client[]
+  featureRequests FeatureRequest[]
+}
+
+model Brand {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  description   String?
+  styleTemplate String   @default("custom") // editorial | studio-product | retro-lab | minimalist | cinematic | custom
+  stylePrompt   String   @db.Text
+  subjects      Json     @default("[]") // [{name, description, refIds}]
+  createdAt     DateTime @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  references  Reference[]
+  campaigns   Campaign[]
+  generations Generation[]
+
+  @@index([userId])
+}
+
+model Reference {
+  id        String   @id @default(cuid())
+  brandId   String
+  blobUrl   String
+  name      String
+  kind      String   @default("turnaround") // turnaround | product | mood | other
+  createdAt DateTime @default(now())
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId])
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+
+  @@index([userId])
+}
+
+model Campaign {
+  id        String   @id @default(cuid())
+  clientId  String
+  brandId   String?
+  name      String
+  createdAt DateTime @default(now())
+
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  brand       Brand?       @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  generations Generation[]
+
+  @@index([clientId])
+}
+
+model Generation {
+  id          String   @id @default(cuid())
+  campaignId  String
+  brandId     String
+  scene       String   @db.Text
+  prompt      String   @db.Text
+  modelText   String?  @db.Text
+  aspectRatio String
+  imageSize   String
+  references  Json     @default("[]")
+  parentId    String?
+  blobUrl     String
+  rating      String   @default("none") // none | love | like | dislike
+  notes       String   @default("") @db.Text
+  tags        Json     @default("[]")
+  author      String
+  createdAt   DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  brand    Brand    @relation(fields: [brandId], references: [id])
+
+  @@index([campaignId])
+  @@index([brandId])
+}
+
+model FeatureRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
