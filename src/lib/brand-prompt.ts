@@ -1,6 +1,12 @@
 // Parameterized port of Lab2-Claude/tools/image-studio/server/lab2mode.js.
 // In LAB2 the brand is hardcoded; here every Brand row supplies its own pieces.
-export type BrandSubject = { name: string; description: string };
+// `refIds` points at Reference rows that depict this subject; /api/generate feeds
+// those images to the model so the same person/product stays consistent.
+export type BrandSubject = {
+  name: string;
+  description: string;
+  refIds?: string[];
+};
 
 export function buildBrandPrompt({
   stylePrompt,
@@ -20,7 +26,17 @@ export function buildBrandPrompt({
       ? `Subject: ${subjects[0].name}.`
       : `Subjects: ${subjects.map((x) => x.name).join(", ")}.`
     : "";
-  return `${stylePrompt}\n${subjectLine}\n${peopleLine}\nScene: ${
-    s || "the brand's signature setting"
-  }.`;
+  // When a subject carries reference images, nudge the model to honor them.
+  const anchorLine = subjects.some((sub) => (sub.refIds ?? []).length > 0)
+    ? "Keep each subject consistent with its labeled reference images."
+    : "";
+  return [
+    stylePrompt,
+    subjectLine,
+    peopleLine,
+    anchorLine,
+    `Scene: ${s || "the brand's signature setting"}.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

@@ -3,14 +3,14 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
-import { generateImage } from "@/lib/gemini";
+import { generateImage, type ReferenceImage } from "@/lib/gemini";
 import { buildBrandPrompt, type BrandSubject } from "@/lib/brand-prompt";
 import { getOrCreateWorkspace } from "@/lib/user";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_REFERENCE_IMAGES = 4;
+const MAX_REFERENCE_IMAGES = 6;
 
 // POST /api/generate — Phase 1 pipeline:
 // buildBrandPrompt() + brand reference images → generateImage() (Gemini) →
@@ -39,22 +39,41 @@ export async function POST(req: Request) {
   const subjects = (brand.subjects as unknown as BrandSubject[]) ?? [];
   const prompt = buildBrandPrompt({ stylePrompt: brand.stylePrompt, subjects, scene });
 
-  // Pull a few of the brand's reference images and feed them to the model so
-  // generations stay visually consistent (not just text-driven).
+  // Map each reference id to the subject(s) it depicts, so we can label the
+  // images we hand the model ("Reference image of X:").
+  const labelByRefId = new Map<string, string>();
+  for (const sub of subjects) {
+    for (const refId of sub.refIds ?? []) {
+      if (sub.name.trim() && !labelByRefId.has(refId)) {
+        labelByRefId.set(refId, `Reference image of ${sub.name.trim()}:`);
+      }
+    }
+  }
+
   const refs = await prisma.reference.findMany({
     where: { brandId: brand.id },
     orderBy: { createdAt: "asc" },
-    take: MAX_REFERENCE_IMAGES,
   });
-  const referenceImages: { mimeType: string; dataBase64: string }[] = [];
+  // Feed subject-anchor images first (consistency of the people/products),
+  // then fill the remaining slots with general style references.
+  const ordered = [
+    ...refs.filter((r) => labelByRefId.has(r.id)),
+    ...refs.filter((r) => !labelByRefId.has(r.id)),
+  ].slice(0, MAX_REFERENCE_IMAGES);
+
+  const referenceImages: ReferenceImage[] = [];
   const usedRefIds: string[] = [];
-  for (const ref of refs) {
+  for (const ref of ordered) {
     try {
       const res = await fetch(ref.blobUrl);
       if (!res.ok) continue;
       const mimeType = res.headers.get("content-type") || "image/png";
       const buf = Buffer.from(await res.arrayBuffer());
-      referenceImages.push({ mimeType, dataBase64: buf.toString("base64") });
+      referenceImages.push({
+        mimeType,
+        dataBase64: buf.toString("base64"),
+        label: labelByRefId.get(ref.id),
+      });
       usedRefIds.push(ref.id);
     } catch {
       // Skip references that can't be fetched.

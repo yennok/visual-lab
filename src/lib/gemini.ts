@@ -7,9 +7,17 @@ export const DEFAULT_MODEL =
 
 export type GeneratedImage = { mimeType: string; dataBase64: string };
 
+// `label` (when present) is emitted as a text part right before the image, so
+// the model can tie a reference to a named subject ("Reference image of X:").
+export type ReferenceImage = {
+  mimeType: string;
+  dataBase64: string;
+  label?: string;
+};
+
 export async function generateImage(opts: {
   prompt: string;
-  referenceImages?: { mimeType: string; dataBase64: string }[];
+  referenceImages?: ReferenceImage[];
   aspectRatio?: string;
   imageSize?: string;
 }): Promise<{ image: GeneratedImage; text: string; model: string }> {
@@ -22,6 +30,7 @@ export async function generateImage(opts: {
     | { text: string }
   > = [];
   for (const ref of opts.referenceImages ?? []) {
+    if (ref.label) parts.push({ text: ref.label });
     parts.push({
       inlineData: { mimeType: ref.mimeType, data: ref.dataBase64 },
     });

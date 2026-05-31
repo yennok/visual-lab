@@ -13,8 +13,11 @@ const TEMPLATES = [
   "custom",
 ];
 
+type RefThumb = { id: string; blobUrl: string; name: string };
+
 export function BrandForm({
   initial,
+  references,
 }: {
   initial: {
     name: string;
@@ -22,6 +25,7 @@ export function BrandForm({
     stylePrompt: string;
     subjects: BrandSubject[];
   };
+  references: RefThumb[];
 }) {
   const [name, setName] = useState(initial.name);
   const [styleTemplate, setStyleTemplate] = useState(initial.styleTemplate);
@@ -32,6 +36,21 @@ export function BrandForm({
 
   function setSubject(i: number, patch: Partial<BrandSubject>) {
     setSubjects((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  }
+
+  function toggleRef(i: number, refId: string) {
+    setSubjects((prev) =>
+      prev.map((s, idx) => {
+        if (idx !== i) return s;
+        const refIds = s.refIds ?? [];
+        return {
+          ...s,
+          refIds: refIds.includes(refId)
+            ? refIds.filter((id) => id !== refId)
+            : [...refIds, refId],
+        };
+      }),
+    );
   }
 
   function handleSave() {
@@ -87,32 +106,72 @@ export function BrandForm({
           Recurring people or products in your images (name + description).
         </span>
         {subjects.map((s, i) => (
-          <div key={i} className="flex gap-2">
-            <input
-              value={s.name}
-              onChange={(e) => setSubject(i, { name: e.target.value })}
-              placeholder="Name"
-              className="w-1/3 rounded-lg border p-2 text-sm outline-none focus:border-black"
-            />
-            <input
-              value={s.description}
-              onChange={(e) => setSubject(i, { description: e.target.value })}
-              placeholder="Description"
-              className="flex-1 rounded-lg border p-2 text-sm outline-none focus:border-black"
-            />
-            <button
-              type="button"
-              onClick={() => setSubjects((prev) => prev.filter((_, idx) => idx !== i))}
-              className="rounded-lg border px-3 text-sm text-zinc-500"
-              aria-label="Remove subject"
-            >
-              ✕
-            </button>
+          <div key={i} className="space-y-2 rounded-lg border p-3">
+            <div className="flex gap-2">
+              <input
+                value={s.name}
+                onChange={(e) => setSubject(i, { name: e.target.value })}
+                placeholder="Name"
+                className="w-1/3 rounded-lg border p-2 text-sm outline-none focus:border-black"
+              />
+              <input
+                value={s.description}
+                onChange={(e) => setSubject(i, { description: e.target.value })}
+                placeholder="Description"
+                className="flex-1 rounded-lg border p-2 text-sm outline-none focus:border-black"
+              />
+              <button
+                type="button"
+                onClick={() => setSubjects((prev) => prev.filter((_, idx) => idx !== i))}
+                className="rounded-lg border px-3 text-sm text-zinc-500"
+                aria-label="Remove subject"
+              >
+                ✕
+              </button>
+            </div>
+            {references.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="block text-xs text-zinc-500">
+                  Reference images of this subject (fed to every generation):
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {references.map((ref) => {
+                    const on = (s.refIds ?? []).includes(ref.id);
+                    return (
+                      <button
+                        key={ref.id}
+                        type="button"
+                        onClick={() => toggleRef(i, ref.id)}
+                        aria-pressed={on}
+                        title={ref.name}
+                        className={`relative h-14 w-14 overflow-hidden rounded-lg border-2 ${
+                          on ? "border-black" : "border-transparent opacity-60"
+                        }`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={ref.blobUrl}
+                          alt={ref.name}
+                          className="h-full w-full object-cover"
+                        />
+                        {on && (
+                          <span className="absolute right-0.5 top-0.5 rounded-full bg-black px-1 text-[10px] leading-4 text-white">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         ))}
         <button
           type="button"
-          onClick={() => setSubjects((prev) => [...prev, { name: "", description: "" }])}
+          onClick={() =>
+            setSubjects((prev) => [...prev, { name: "", description: "", refIds: [] }])
+          }
           className="text-sm text-zinc-600 underline"
         >
           + Add subject

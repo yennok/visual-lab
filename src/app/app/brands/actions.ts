@@ -26,8 +26,21 @@ export async function updateBrand(input: {
   // getOrCreateWorkspace returns this user's own brand, so the update is scoped.
   const { brand } = await getOrCreateWorkspace();
 
+  // Only let subjects point at references that actually belong to this brand.
+  const ownRefs = await prisma.reference.findMany({
+    where: { brandId: brand.id },
+    select: { id: true },
+  });
+  const ownRefIds = new Set(ownRefs.map((r) => r.id));
+
   const subjects = (input.subjects ?? [])
-    .map((s) => ({ name: s.name.trim(), description: s.description.trim() }))
+    .map((s) => ({
+      name: s.name.trim(),
+      description: s.description.trim(),
+      refIds: Array.from(new Set(s.refIds ?? [])).filter((id) =>
+        ownRefIds.has(id),
+      ),
+    }))
     .filter((s) => s.name.length > 0);
 
   await prisma.brand.update({

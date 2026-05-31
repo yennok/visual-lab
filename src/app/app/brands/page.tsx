@@ -56,6 +56,11 @@ export default async function BrandsPage() {
         </h2>
         <BrandForm
           key={brand.stylePrompt}
+          references={references.map((r) => ({
+            id: r.id,
+            blobUrl: r.blobUrl,
+            name: r.name,
+          }))}
           initial={{
             name: brand.name,
             styleTemplate: brand.styleTemplate,
