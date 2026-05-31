@@ -15,7 +15,12 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className="h-full antialiased">
-        <body className="min-h-full">{children}</body>
+        {/* Browser extensions (e.g. ColorZilla adds cz-shortcut-listen) mutate
+            <body> before React hydrates, causing a spurious mismatch. This
+            suppresses the warning for this element's own attributes only. */}
+        <body className="min-h-full" suppressHydrationWarning>
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   );
