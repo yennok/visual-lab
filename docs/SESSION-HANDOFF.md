@@ -25,7 +25,7 @@ _Last updated: 2026-05-31_
 - ✅ **Composer + Gallery** ב-`/app`
 - ✅ סכמת DB + מיגרציות (כולל עמודת `palette` שתוקנה בסשן זה)
 
-**ענף עבודה**: `claude/pensive-dirac-ZVM13` (committed + pushed, נקי)
+**ענף עבודה**: `claude/compassionate-cori-skKiT` (committed + pushed, נקי)
 
 ---
 
@@ -136,4 +136,9 @@ npm run dev
 
 ## 9. Changelog
 
+- **2026-05-31 (סשן 2)** — **Slice 2 + Brand Studio editable inputs** (ענף `claude/compassionate-cori-skKiT`):
+  - **Slice 2 — Subjects עם תמונות**: `BrandSubject` קיבל `refIds`; ב-Brand Studio אפשר לשייך reference images לכל subject (בורר thumbnails). `/api/generate` מאכיל קודם את תמונות ה-subject (מתויגות בשם ה-subject דרך `label` חדש ב-`generateImage`), ואז ממלא בשאר ה-references לסגנון (cap הועלה ל-6). `buildBrandPrompt` מוסיף רמז לשמירת עקביות מול התמונות המתויגות.
+  - **Palette עריכה**: `PaletteEditor` — עריכת/מחיקת/הוספת גוונים (color picker + hex), כולל **"Extract from image"** שמחלץ קודי hex/RGB שכתובים כטקסט בתמונה (למשל צילום מסך של brand guideline) דרך Gemini vision (`extractPaletteFromImage`). פאלטה ידנית עד 12 גוונים.
+  - **Tags**: הניתוח מחזיר עכשיו 5-8 highlights → נשמרים ל-`Brand.tags` (עמודה+מיגרציה `20260531130000_brand_tags`). `TagsEditor` לעריכה/הוספה/מחיקה ידנית. הניתוח ממזג tags חדשים עם קיימים.
+  - הפילוסופיה: **AI analysis + הזנה ידנית** = עקביות מותג נשלטת ע"י המשתמש.
 - **2026-05-31** — תוקנה קריסת Analyze: נוספה עמודת `Brand.palette` (Json) + מיגרציה `20260531120000_brand_palette`. Analyze נבדק על מותג אמיתי → עובד מעולה. נוצר מסמך handoff זה.
