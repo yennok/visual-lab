@@ -8,7 +8,9 @@ import type { BrandSubject } from "@/lib/brand-prompt";
 import {
   analyzeBrandImages,
   composeStylePrompt,
+  extractPaletteFromImage,
   normalizePalette,
+  normalizeTags,
   type BrandImage,
 } from "@/lib/brand-analysis";
 
@@ -134,11 +136,15 @@ export async function analyzeBrand(): Promise<{ ok: boolean; error?: string }> {
 
   try {
     const analysis = await analyzeBrandImages(images);
+    // Merge AI tags with any the user already curated, AI palette replaces the
+    // analyzed swatches (the user can still hand-edit afterwards).
+    const existingTags = (brand.tags as unknown as string[]) ?? [];
     await prisma.brand.update({
       where: { id: brand.id },
       data: {
         stylePrompt: composeStylePrompt(analysis),
         palette: normalizePalette(analysis.palette),
+        tags: normalizeTags([...analysis.tags, ...existingTags]),
       },
     });
   } catch (err) {
@@ -151,4 +157,57 @@ export async function analyzeBrand(): Promise<{ ok: boolean; error?: string }> {
   revalidatePath("/app");
   revalidatePath("/app/brands");
   return { ok: true };
+}
+
+// Persist a hand-edited palette (AI-extracted swatches + manual additions).
+export async function updatePalette(palette: string[]) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not authenticated");
+  const { brand } = await getOrCreateWorkspace();
+
+  await prisma.brand.update({
+    where: { id: brand.id },
+    data: { palette: normalizePalette(palette, 12) },
+  });
+  revalidatePath("/app/brands");
+}
+
+// Persist hand-edited tags (AI highlights + manual additions).
+export async function updateTags(tags: string[]) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not authenticated");
+  const { brand } = await getOrCreateWorkspace();
+
+  await prisma.brand.update({
+    where: { id: brand.id },
+    data: { tags: normalizeTags(tags) },
+  });
+  revalidatePath("/app/brands");
+}
+
+// Read hex/RGB color codes written as text in an uploaded image (e.g. a brand
+// guideline). Returns the extracted hex colors for the client to merge in.
+export async function extractColorsFromImage(input: {
+  mimeType: string;
+  dataBase64: string;
+}): Promise<{ ok: boolean; colors?: string[]; error?: string }> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not authenticated");
+  await getOrCreateWorkspace();
+
+  try {
+    const colors = await extractPaletteFromImage({
+      mimeType: input.mimeType || "image/png",
+      dataBase64: input.dataBase64,
+    });
+    if (colors.length === 0) {
+      return { ok: false, error: "No color codes found in that image." };
+    }
+    return { ok: true, colors };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not read colors.",
+    };
+  }
 }

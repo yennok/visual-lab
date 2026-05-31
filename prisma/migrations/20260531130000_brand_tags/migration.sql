@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Brand" ADD COLUMN "tags" JSONB NOT NULL DEFAULT '[]';

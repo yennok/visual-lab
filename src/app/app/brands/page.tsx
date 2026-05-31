@@ -2,7 +2,8 @@ import type { BrandSubject } from "@/lib/brand-prompt";
 import { prisma } from "@/lib/db";
 import { getOrCreateWorkspace } from "@/lib/user";
 import { BrandForm } from "./brand-form";
-import { Palette } from "./palette";
+import { PaletteEditor } from "./palette-editor";
+import { TagsEditor } from "./tags-editor";
 import { ReferenceUploader } from "./reference-uploader";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,7 @@ export default async function BrandsPage() {
   });
   const subjects = (brand.subjects as unknown as BrandSubject[]) ?? [];
   const palette = (brand.palette as unknown as string[]) ?? [];
+  const tags = (brand.tags as unknown as string[]) ?? [];
 
   return (
     <section className="max-w-3xl space-y-8">
@@ -41,14 +43,26 @@ export default async function BrandsPage() {
         />
       </div>
 
-      {palette.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Palette
-          </h2>
-          <Palette palette={palette} />
-        </div>
-      )}
+      <div className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          Palette
+        </h2>
+        <p className="text-xs text-zinc-500">
+          AI-extracted from your references. Edit, remove, add your own (pick or
+          type a hex), or pull colors from an image of brand-guideline swatches.
+        </p>
+        <PaletteEditor key={palette.join(",")} initial={palette} />
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          Tags
+        </h2>
+        <p className="text-xs text-zinc-500">
+          The brand&apos;s defining highlights — AI-suggested, fully yours to edit.
+        </p>
+        <TagsEditor key={tags.join(",")} initial={tags} />
+      </div>
 
       <div className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
