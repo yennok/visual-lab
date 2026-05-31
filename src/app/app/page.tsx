@@ -6,11 +6,20 @@ export const dynamic = "force-dynamic";
 
 export default async function AppHome() {
   const { brand, campaign } = await getOrCreateWorkspace();
-  const generations = await prisma.generation.findMany({
-    where: { campaignId: campaign.id },
-    orderBy: { createdAt: "desc" },
-    take: 60,
-  });
+  const [generations, references] = await Promise.all([
+    prisma.generation.findMany({
+      where: { campaignId: campaign.id },
+      orderBy: { createdAt: "desc" },
+      take: 60,
+    }),
+    prisma.reference.findMany({
+      where: { brandId: brand.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, blobUrl: true, name: true },
+    }),
+  ]);
+  const palette = (brand.palette as unknown as string[]) ?? [];
+  const tags = (brand.tags as unknown as string[]) ?? [];
 
   return (
     <section className="space-y-6">
@@ -21,7 +30,7 @@ export default async function AppHome() {
         </p>
       </div>
 
-      <Composer />
+      <Composer palette={palette} tags={tags} references={references} />
 
       {generations.length === 0 ? (
         <p className="text-zinc-500">

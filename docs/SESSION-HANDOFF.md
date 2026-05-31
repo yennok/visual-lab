@@ -22,7 +22,7 @@ _Last updated: 2026-05-31_
 - ✅ **Brand Studio v1** — העלאת reference images + ניתוח AI (`/app/brands`)
 - ✅ **Analyze** — Gemini מחזיר styleDescription, palette, lighting, mood, composition → נשמר ל-`Brand.stylePrompt` + `Brand.palette`
 - ✅ **Generation pipeline** — `/api/generate`: buildBrandPrompt + reference images → Gemini image model → Vercel Blob → שורת `Generation`
-- ✅ **Composer + Gallery** ב-`/app`
+- ✅ **Composer v2 + Gallery** ב-`/app` — שפר-פרומפט, בחירת palette/tags (override per-generation), reference picker + העלאה זמנית
 - ✅ סכמת DB + מיגרציות (כולל עמודת `palette` שתוקנה בסשן זה)
 
 **ענף עבודה**: `claude/compassionate-cori-skKiT` (committed + pushed, נקי)
@@ -40,7 +40,9 @@ src/
     app/                          # ← האפליקציה המוגנת
       layout.tsx
       page.tsx                    # Workspace: Composer + Gallery of generations
-      _components/composer.tsx    # טופס יצירת תמונה (scene → /api/generate)
+      actions.ts                  # server action: improvePrompt (שפר פרומפט)
+      _components/composer.tsx    # טופס יצירה: scene + improve + palette/tags/refs overrides
+      _components/reference-picker.tsx  # בחירת references המותג + העלאה זמנית ליצירה
       brands/
         page.tsx                  # Brand Studio: references + Analyze + palette
         actions.ts                # server actions: saveBrand, analyzeBrand ⭐
@@ -52,7 +54,8 @@ src/
       blob/upload/route.ts        # העלאת reference ל-Vercel Blob
   lib/
     brand-analysis.ts             # ⭐ analyzeBrandImages + composeStylePrompt + normalizePalette
-    brand-prompt.ts               # buildBrandPrompt(stylePrompt, subjects, scene)
+    prompt-improve.ts             # improveScenePrompt() — שפר פרומפט (Gemini text)
+    brand-prompt.ts               # buildBrandPrompt(stylePrompt, subjects, scene, tags, palette)
     gemini.ts                     # generateImage() — קורא למודל התמונות
     db.ts                         # Prisma client singleton
     user.ts                       # getOrCreateWorkspace() — User/Brand/Client/Campaign
@@ -136,6 +139,11 @@ npm run dev
 
 ## 9. Changelog
 
+- **2026-05-31 (סשן 3)** — **Workspace Composer v2** (ענף `claude/compassionate-cori-skKiT`):
+  - **שפר פרומפט**: כפתור "✨ Improve prompt" ב-Composer → server action `improvePrompt` (`src/app/app/actions.ts`) → `improveScenePrompt` (`src/lib/prompt-improve.ts`, דפוס Gemini-text כמו `brand-analysis`). התוצאה **מחליפה את הטקסט בתיבה** (ניתן לעריכה).
+  - **בחירת palette + tags ב-Composer**: chips של `brand.palette`/`brand.tags`, **כולם מסומנים כברירת מחדל**, toggle. ההורדה היא **override ליצירה הזו בלבד** — לא משנה את המותג השמור. `palette` כעת **פעיל ביצירה** (`buildBrandPrompt` מוסיף שורת `Color palette:`; קודם נשמר ולא בשימוש).
+  - **Reference picker** (`src/app/app/_components/reference-picker.tsx`): מציג את מאגר ה-references המשותף של המותג לבחירה (default הכל), **+ העלאת תמונות זמניות** ליצירה הנוכחית בלבד — לא נשמרות ל-`Reference` (מועברות כ-`extraReferenceUrls`, fetch מוגן ב-whitelist ל-host של Vercel Blob נגד SSRF).
+  - **`/api/generate`** קיבל שדות אופציונליים: `palette`, `tags`, `referenceIds`, `extraReferenceUrls` (כולם backward-compatible; מערך ריק=override "בלי", `undefined`=ברירת מחדל מהמותג). **ללא שינוי סכמה.**
 - **2026-05-31 (סשן 2)** — **Slice 2 + Brand Studio editable inputs** (ענף `claude/compassionate-cori-skKiT`):
   - **Slice 2 — Subjects עם תמונות**: `BrandSubject` קיבל `refIds`; ב-Brand Studio אפשר לשייך reference images לכל subject (בורר thumbnails). `/api/generate` מאכיל קודם את תמונות ה-subject (מתויגות בשם ה-subject דרך `label` חדש ב-`generateImage`), ואז ממלא בשאר ה-references לסגנון (cap הועלה ל-6). `buildBrandPrompt` מוסיף רמז לשמירת עקביות מול התמונות המתויגות.
   - **Palette עריכה**: `PaletteEditor` — עריכת/מחיקת/הוספת גוונים (color picker + hex), כולל **"Extract from image"** שמחלץ קודי hex/RGB שכתובים כטקסט בתמונה (למשל צילום מסך של brand guideline) דרך Gemini vision (`extractPaletteFromImage`). פאלטה ידנית עד 12 גוונים.

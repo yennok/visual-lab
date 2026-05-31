@@ -13,11 +13,13 @@ export function buildBrandPrompt({
   subjects,
   scene,
   tags,
+  palette,
 }: {
   stylePrompt: string;
   subjects: BrandSubject[];
   scene: string;
   tags?: string[];
+  palette?: string[];
 }) {
   const s = (scene || "").trim();
   const peopleLine = subjects.length
@@ -37,12 +39,20 @@ export function buildBrandPrompt({
   const tagLine = cleanTags.length
     ? `Brand keywords: ${cleanTags.join(", ")}.`
     : "";
+  // Selected palette colors steer the overall color story for this generation.
+  const cleanPalette = (palette ?? [])
+    .map((c) => c.trim().toLowerCase())
+    .filter((c) => /^#[0-9a-f]{6}$/.test(c));
+  const paletteLine = cleanPalette.length
+    ? `Color palette: ${cleanPalette.join(", ")}.`
+    : "";
   return [
     stylePrompt,
     subjectLine,
     peopleLine,
     anchorLine,
     tagLine,
+    paletteLine,
     `Scene: ${s || "the brand's signature setting"}.`,
   ]
     .filter(Boolean)

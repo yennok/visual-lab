@@ -21,7 +21,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { scene?: string; aspectRatio?: string; imageSize?: string };
+  let body: {
+    scene?: string;
+    aspectRatio?: string;
+    imageSize?: string;
+    palette?: string[];
+    tags?: string[];
+    referenceIds?: string[];
+    extraReferenceUrls?: string[];
+  };
   try {
     body = await req.json();
   } catch {
@@ -37,12 +45,19 @@ export async function POST(req: Request) {
 
   const { brand, campaign } = await getOrCreateWorkspace();
   const subjects = (brand.subjects as unknown as BrandSubject[]) ?? [];
-  const tags = (brand.tags as unknown as string[]) ?? [];
+  // Per-generation overrides: an explicit array (even empty) wins; `undefined`
+  // falls back to the brand's saved values. This lets the Composer say "use no
+  // tags" distinctly from "I didn't send an override".
+  const brandTags = (brand.tags as unknown as string[]) ?? [];
+  const brandPalette = (brand.palette as unknown as string[]) ?? [];
+  const tags = Array.isArray(body.tags) ? body.tags : brandTags;
+  const palette = Array.isArray(body.palette) ? body.palette : brandPalette;
   const prompt = buildBrandPrompt({
     stylePrompt: brand.stylePrompt,
     subjects,
     scene,
     tags,
+    palette,
   });
 
   // Map each reference id to the subject(s) it depicts, so we can label the
@@ -56,10 +71,16 @@ export async function POST(req: Request) {
     }
   }
 
-  const refs = await prisma.reference.findMany({
+  let refs = await prisma.reference.findMany({
     where: { brandId: brand.id },
     orderBy: { createdAt: "asc" },
   });
+  // When the Composer sends an explicit reference selection, honor it (already
+  // scoped to this brand by the query above); otherwise use them all.
+  if (Array.isArray(body.referenceIds)) {
+    const picked = new Set(body.referenceIds);
+    refs = refs.filter((r) => picked.has(r.id));
+  }
   // Feed subject-anchor images first (consistency of the people/products),
   // then fill the remaining slots with general style references.
   const ordered = [
@@ -83,6 +104,32 @@ export async function POST(req: Request) {
       usedRefIds.push(ref.id);
     } catch {
       // Skip references that can't be fetched.
+    }
+  }
+
+  // Temporary, per-generation reference images uploaded straight from the
+  // Workspace. They are NOT persisted to the brand (no Reference row, not in
+  // usedRefIds). We only fetch URLs that live on our own Vercel Blob store —
+  // fetching arbitrary client-supplied URLs server-side would be an SSRF hole.
+  if (Array.isArray(body.extraReferenceUrls)) {
+    for (const url of body.extraReferenceUrls) {
+      if (referenceImages.length >= MAX_REFERENCE_IMAGES) break;
+      let host: string;
+      try {
+        host = new URL(url).hostname;
+      } catch {
+        continue;
+      }
+      if (!host.endsWith(".blob.vercel-storage.com")) continue;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const mimeType = res.headers.get("content-type") || "image/png";
+        const buf = Buffer.from(await res.arrayBuffer());
+        referenceImages.push({ mimeType, dataBase64: buf.toString("base64") });
+      } catch {
+        // Skip temporary references that can't be fetched.
+      }
     }
   }
 
