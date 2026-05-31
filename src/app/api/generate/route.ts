@@ -37,7 +37,13 @@ export async function POST(req: Request) {
 
   const { brand, campaign } = await getOrCreateWorkspace();
   const subjects = (brand.subjects as unknown as BrandSubject[]) ?? [];
-  const prompt = buildBrandPrompt({ stylePrompt: brand.stylePrompt, subjects, scene });
+  const tags = (brand.tags as unknown as string[]) ?? [];
+  const prompt = buildBrandPrompt({
+    stylePrompt: brand.stylePrompt,
+    subjects,
+    scene,
+    tags,
+  });
 
   // Map each reference id to the subject(s) it depicts, so we can label the
   // images we hand the model ("Reference image of X:").
