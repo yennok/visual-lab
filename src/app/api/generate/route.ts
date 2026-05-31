@@ -141,27 +141,47 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  const buffer = Buffer.from(result.image.dataBase64, "base64");
-  const ext = result.image.mimeType.includes("jpeg") ? "jpg" : "png";
-  const blob = await put(`generations/${randomUUID()}.${ext}`, buffer, {
-    access: "public",
-    contentType: result.image.mimeType,
-  });
+  if (!result.image?.dataBase64) {
+    return NextResponse.json(
+      {
+        error:
+          result.text?.trim() ||
+          "The model returned no image. Try again or adjust the prompt.",
+      },
+      { status: 502 },
+    );
+  }
 
-  const generation = await prisma.generation.create({
-    data: {
-      campaignId: campaign.id,
-      brandId: brand.id,
-      scene,
-      prompt,
-      modelText: result.text || null,
-      aspectRatio,
-      imageSize,
-      references: usedRefIds,
-      blobUrl: blob.url,
-      author: userId,
-    },
-  });
+  // Persisting the result (Blob upload + DB row) can also fail — keep it inside a
+  // try so the client always gets a JSON error instead of an empty 500 body.
+  let generation;
+  try {
+    const buffer = Buffer.from(result.image.dataBase64, "base64");
+    const ext = result.image.mimeType.includes("jpeg") ? "jpg" : "png";
+    const blob = await put(`generations/${randomUUID()}.${ext}`, buffer, {
+      access: "public",
+      contentType: result.image.mimeType,
+    });
+
+    generation = await prisma.generation.create({
+      data: {
+        campaignId: campaign.id,
+        brandId: brand.id,
+        scene,
+        prompt,
+        modelText: result.text || null,
+        aspectRatio,
+        imageSize,
+        references: usedRefIds,
+        blobUrl: blob.url,
+        author: userId,
+      },
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Could not save the generated image.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   return NextResponse.json({ generation });
 }

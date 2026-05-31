@@ -63,8 +63,16 @@ export function Composer({
           extraReferenceUrls: tempRefUrls,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Generation failed.");
+      // Read the body as text first: a failing route can return an empty body,
+      // and res.json() on "" throws "Unexpected end of JSON input", masking the
+      // real status.
+      const raw = await res.text();
+      const data = raw ? JSON.parse(raw) : null;
+      if (!res.ok) {
+        throw new Error(
+          data?.error ?? `Generation failed (HTTP ${res.status}).`,
+        );
+      }
       setScene("");
       setTempRefUrls([]);
       router.refresh();
