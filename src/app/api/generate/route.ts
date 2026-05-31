@@ -10,9 +10,11 @@ import { getOrCreateWorkspace } from "@/lib/user";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const MAX_REFERENCE_IMAGES = 4;
+
 // POST /api/generate — Phase 1 pipeline:
-// buildBrandPrompt() → generateImage() (Gemini) → Blob put() → Generation row.
-// Gated by middleware; the auth() check is defense-in-depth.
+// buildBrandPrompt() + brand reference images → generateImage() (Gemini) →
+// Blob put() → Generation row. Gated by middleware; auth() is defense-in-depth.
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) {
@@ -37,9 +39,31 @@ export async function POST(req: Request) {
   const subjects = (brand.subjects as unknown as BrandSubject[]) ?? [];
   const prompt = buildBrandPrompt({ stylePrompt: brand.stylePrompt, subjects, scene });
 
+  // Pull a few of the brand's reference images and feed them to the model so
+  // generations stay visually consistent (not just text-driven).
+  const refs = await prisma.reference.findMany({
+    where: { brandId: brand.id },
+    orderBy: { createdAt: "asc" },
+    take: MAX_REFERENCE_IMAGES,
+  });
+  const referenceImages: { mimeType: string; dataBase64: string }[] = [];
+  const usedRefIds: string[] = [];
+  for (const ref of refs) {
+    try {
+      const res = await fetch(ref.blobUrl);
+      if (!res.ok) continue;
+      const mimeType = res.headers.get("content-type") || "image/png";
+      const buf = Buffer.from(await res.arrayBuffer());
+      referenceImages.push({ mimeType, dataBase64: buf.toString("base64") });
+      usedRefIds.push(ref.id);
+    } catch {
+      // Skip references that can't be fetched.
+    }
+  }
+
   let result;
   try {
-    result = await generateImage({ prompt, aspectRatio, imageSize });
+    result = await generateImage({ prompt, referenceImages, aspectRatio, imageSize });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Image generation failed.";
     return NextResponse.json({ error: message }, { status: 502 });
@@ -61,6 +85,7 @@ export async function POST(req: Request) {
       modelText: result.text || null,
       aspectRatio,
       imageSize,
+      references: usedRefIds,
       blobUrl: blob.url,
       author: userId,
     },

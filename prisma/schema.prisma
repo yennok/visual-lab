@@ -33,6 +33,7 @@ model Brand {
   styleTemplate String   @default("custom") // editorial | studio-product | retro-lab | minimalist | cinematic | custom
   stylePrompt   String   @db.Text
   subjects      Json     @default("[]") // [{name, description, refIds}]
+  palette       Json     @default("[]") // ["#rrggbb", ...] extracted by brand analysis
   createdAt     DateTime @default(now())
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
