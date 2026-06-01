@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
+import { blobReadWriteToken } from "@/lib/blob";
 import { prisma } from "@/lib/db";
 import { generateImage, type ReferenceImage } from "@/lib/gemini";
 import { buildBrandPrompt, type BrandSubject } from "@/lib/brand-prompt";
@@ -161,6 +162,7 @@ export async function POST(req: Request) {
     const blob = await put(`generations/${randomUUID()}.${ext}`, buffer, {
       access: "public",
       contentType: result.image.mimeType,
+      token: blobReadWriteToken(),
     });
 
     generation = await prisma.generation.create({

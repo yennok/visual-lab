@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
+import { blobReadWriteToken } from "@/lib/blob";
 
 // Token endpoint for client-side uploads of brand reference images.
 // The browser uploads straight to Vercel Blob (avoiding the 4.5MB server-body
@@ -14,6 +15,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const jsonResponse = await handleUpload({
       body,
       request,
+      token: blobReadWriteToken(),
       onBeforeGenerateToken: async () => {
         const { userId } = await auth();
         if (!userId) throw new Error("Unauthorized");
